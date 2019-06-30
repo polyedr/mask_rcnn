@@ -66,7 +66,7 @@ class Form_loginConfig(Config):
     IMAGES_PER_GPU = 2
 
     # Number of classes (including background)
-    NUM_CLASSES = 1 + 5  # Background + form_login
+    NUM_CLASSES = 1 + 7  # Background + form_login
 
     # Number of training steps per epoch
     STEPS_PER_EPOCH = 100
@@ -92,6 +92,8 @@ class Form_loginDataset(utils.Dataset):
         self.add_class("form_login", 3, "hyperlink")
         self.add_class("form_login", 4, "text")
         self.add_class("form_login", 5, "select")
+        self.add_class("form_login", 6, "div")
+        self.add_class("form_login", 7, "image")
 
         # Train or validation dataset?
         assert subset in ["train", "val"]
@@ -141,14 +143,16 @@ class Form_loginDataset(utils.Dataset):
             # Unfortunately, VIA doesn't include it in JSON, so we must read
             # the image. This is only managable since the dataset is tiny.
 
-            objects = [s['region_attributes'] for s in a['regions']]
-            
+            objects = [r['region_attributes'] for r in a['regions']]
+
+            '''
             # Check the presense of the HTML elements types
             classids = [(n['HTML element']) for n in objects]
             for classid in classids:
                 print(classid.keys())
 
             class_ids = [int(n['HTML element']) for n in objects]
+            '''
 
             image_path = os.path.join(dataset_dir, a['filename'])
             image = skimage.io.imread(image_path)
@@ -160,7 +164,7 @@ class Form_loginDataset(utils.Dataset):
                 path=image_path,
                 width=width, height=height,
                 rectangles=rectangles,
-                class_ids=class_ids)
+                objects=objects)
 
     def load_mask(self, image_id):
         """Generate instance masks for an image.
@@ -173,7 +177,8 @@ class Form_loginDataset(utils.Dataset):
         image_info = self.image_info[image_id]
         if image_info["source"] != "form_login":
             return super(self.__class__, self).load_mask(image_id)
-        class_ids = image_info['class_ids']
+
+        class_names = image_info['objects']
 
         # Convert rectangles to a bitmap mask of shape
         # [height, width, instance_count]
@@ -181,8 +186,8 @@ class Form_loginDataset(utils.Dataset):
         mask = np.zeros([info["height"], info["width"], len(info["rectangles"])],
                         dtype=np.uint8)
         for i, p in enumerate(info["rectangles"]):
-            print(i)
-            print(p)
+            # print(i)
+            # print(p)
             # Get indexes of pixels inside the rectangle and set them to 1
             # rr, cc = skimage.draw.rectangle(p['all_points_y'], p['all_points_x'])
             # https://scikit-image.org/docs/dev/api/skimage.draw.html#skimage.draw.rectangle
@@ -197,15 +202,72 @@ class Form_loginDataset(utils.Dataset):
             
             # rr, cc = skimage.draw.rectangle(start, extent=extent, shape=img.shape)
             rr, cc = skimage.draw.rectangle(start, extent=extent)            
-            print(rr)
-            print(cc)
+            # print(rr)
+            # print(cc)
             mask[rr, cc, i] = 1
-
+        # Assign class_ids by reading class_names
+        class_ids = np.zeros([len(info["rectangles"])])
         # Return mask, and array of class IDs of each instance. Since we have
         # one class ID only, we return an array of 1s
         # return mask.astype(np.bool), np.ones([mask.shape[-1]], dtype=np.int32)
+
+        # In the form_login dataset, pictures are labeled with name 'input' and 'button' representing input and button.
+        for i, p in enumerate(class_names):
+            # print('HTML element=', p['HTML element'])
+            # print("i=",i)
+            # temp = p['HTML element']
+            # for key in temp:
+            #     print('temp=', temp)
+            #     print(key)
+            # "name" is the attributes name decided when labeling, etc. 'region_attributes': {name:'a'} // "region_attributes":{"HTML element":{"input":true}}}
+            '''
+            if p['HTML element'] == 'input':
+                class_ids[i] = 1
+
+            elif p['HTML element'] == 'button':
+                class_ids[i] = 2
+
+            elif p['HTML element'] == 'hyperlink':
+                class_ids[i] = 3
+
+            elif p['HTML element'] == 'text':
+                class_ids[i] = 4
+
+            elif p['HTML element'] == 'select':
+                class_ids[i] = 5
+            '''
+
+            if 'input' in p['HTML element']:
+                class_ids[i] = 1
+
+            elif 'button' in p['HTML element']:
+                class_ids[i] = 2
+
+            elif 'hyperlink' in p['HTML element']:
+                class_ids[i] = 3
+
+            elif 'text' in p['HTML element']:
+                class_ids[i] = 4
+
+            elif 'select' in p['HTML element']:
+                class_ids[i] = 5
+
+            elif 'div' in p['HTML element']:
+                class_ids[i] = 6
+
+            elif 'image' in p['HTML element']:
+                class_ids[i] = 7
+
+
+        # assert code here to extend to other labels
+
+        # Should return multiple classes ids
         class_ids = np.array(class_ids, dtype=np.int32)
+
+        # class_ids = class_ids.astype(int)
+
         return mask.astype(np.bool), class_ids
+
     
 
     def image_reference(self, image_id):
