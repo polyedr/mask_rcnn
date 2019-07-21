@@ -69,7 +69,7 @@ class Form_loginConfig(Config):
     NUM_CLASSES = 1 + 7  # Background + form_login
 
     # Number of training steps per epoch
-    STEPS_PER_EPOCH = 10
+    STEPS_PER_EPOCH = 40
 
     # Skip detections with < 90% confidence
     DETECTION_MIN_CONFIDENCE = 0.9
@@ -86,14 +86,15 @@ class Form_loginDataset(utils.Dataset):
         dataset_dir: Root directory of the dataset.
         subset: Subset to load: train or val
         """
-        # Add classes. We have five classes to add.
+        # Add classes. We have eleven classes to add.
         self.add_class("form_login", 1, "input")
         self.add_class("form_login", 2, "button")
-        self.add_class("form_login", 3, "hyperlink")
-        self.add_class("form_login", 4, "text")
-        self.add_class("form_login", 5, "select")
-        self.add_class("form_login", 6, "div")
+        self.add_class("form_login", 3, "text")
+        self.add_class("form_login", 4, "select")
+        self.add_class("form_login", 5, "checkbox")
+        self.add_class("form_login", 6, "radiobutton")
         self.add_class("form_login", 7, "image")
+
 
         # Train or validation dataset?
         assert subset in ["train", "val"]
@@ -243,21 +244,20 @@ class Form_loginDataset(utils.Dataset):
             elif 'button' in p['HTML element']:
                 class_ids[i] = 2
 
-            elif 'hyperlink' in p['HTML element']:
+            elif 'text' in p['HTML element']:
                 class_ids[i] = 3
 
-            elif 'text' in p['HTML element']:
+            elif 'select' in p['HTML element']:
                 class_ids[i] = 4
 
-            elif 'select' in p['HTML element']:
+            elif 'checkbox' in p['HTML element']:
                 class_ids[i] = 5
 
-            elif 'div' in p['HTML element']:
+            elif 'radiobutton' in p['HTML element']:
                 class_ids[i] = 6
 
             elif 'image' in p['HTML element']:
                 class_ids[i] = 7
-
 
         # assert code here to extend to other labels
 
@@ -298,7 +298,7 @@ def train(model):
     print("Training network heads")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=5,
+                epochs=50,
                 layers='heads')
 
 
